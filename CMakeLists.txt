@@ -1,0 +1,12 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
+PROJECT(fsiv_calibAR)
+ENABLE_LANGUAGE(CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_FLAGS_DEBUG "-ggdb3 -O0 -Wall")
+set(CMAKE_CXX_FLAGS_RELEASE "-g -O3 -Wall")
+
+FIND_PACKAGE(OpenCV REQUIRED )
+LINK_LIBRARIES(${OpenCV_LIBS})
+include_directories ("${OpenCV_INCLUDE_DIRS}")
+
+ADD_EXECUTABLE(fsiv_calibAR fsiv_main_p3.cpp fsiv_funcs.cpp)
