@@ -208,44 +208,83 @@ int main(int argc, char** argv)
                 cv::resize(output, output_resized, frame.size());
             }
 
-            // ensure all images have exactly the same size before concatenation
+            // ensure all images have exactly the same size and type before concatenation
             cv::Size target_size = frame.size();
             cv::Mat frame_vis, blurred_vis, mag_vis_resized, mask_vis_resized, output_vis;
             
-            frame.copyTo(frame_vis);
-            if (blurred_box.size() != target_size)
-                cv::resize(blurred_box, blurred_vis, target_size);
+            // ensure frame is CV_8UC3
+            if (frame.type() != CV_8UC3)
+                frame.convertTo(frame_vis, CV_8UC3);
+            else
+                frame.copyTo(frame_vis);
+            if (frame_vis.size() != target_size)
+                cv::resize(frame_vis, frame_vis, target_size);
+            
+            // ensure blurred_box is CV_8UC3 and correct size
+            if (blurred_box.type() != CV_8UC3)
+                blurred_box.convertTo(blurred_vis, CV_8UC3);
             else
                 blurred_box.copyTo(blurred_vis);
+            if (blurred_vis.size() != target_size)
+                cv::resize(blurred_vis, blurred_vis, target_size);
                 
-            if (mag_vis.size() != target_size)
-                cv::resize(mag_vis, mag_vis_resized, target_size);
+            // ensure mag_vis is CV_8UC3 and correct size
+            if (mag_vis.type() != CV_8UC3)
+                mag_vis.convertTo(mag_vis_resized, CV_8UC3);
             else
                 mag_vis.copyTo(mag_vis_resized);
+            if (mag_vis_resized.size() != target_size)
+                cv::resize(mag_vis_resized, mag_vis_resized, target_size);
                 
-            if (mask_vis.size() != target_size)
-                cv::resize(mask_vis, mask_vis_resized, target_size);
+            // ensure mask_vis is CV_8UC3 and correct size
+            if (mask_vis.type() != CV_8UC3)
+                mask_vis.convertTo(mask_vis_resized, CV_8UC3);
             else
                 mask_vis.copyTo(mask_vis_resized);
+            if (mask_vis_resized.size() != target_size)
+                cv::resize(mask_vis_resized, mask_vis_resized, target_size);
                 
-            if (output_resized.size() != target_size)
-                cv::resize(output_resized, output_vis, target_size);
+            // ensure output is CV_8UC3 and correct size
+            if (output_resized.type() != CV_8UC3)
+                output_resized.convertTo(output_vis, CV_8UC3);
             else
                 output_resized.copyTo(output_vis);
+            if (output_vis.size() != target_size)
+                cv::resize(output_vis, output_vis, target_size);
+
+            // create empty panel with exact same size and type
+            cv::Mat empty_panel = cv::Mat::zeros(target_size, CV_8UC3);
 
             // combine into five-panel debug image: 
             // row 1: original, blurred, flow mag (3 panels)
             // row 2: mask, result, empty (3 panels to match width)
             cv::Mat debug_row1, debug_row2, debug_image;
+            
+            // build row 1: frame + blurred + mag
             cv::hconcat(frame_vis, blurred_vis, debug_row1);
             cv::hconcat(debug_row1, mag_vis_resized, debug_row1);
             
-            // create empty panel to match row 1 width
-            cv::Mat empty_panel = cv::Mat::zeros(target_size, CV_8UC3);
+            // build row 2: mask + output + empty
             cv::hconcat(mask_vis_resized, output_vis, debug_row2);
             cv::hconcat(debug_row2, empty_panel, debug_row2);
             
-            // stack rows vertically (now both have same width and height)
+            // verify both rows have same width before vconcat
+            if (debug_row1.cols != debug_row2.cols)
+            {
+                // resize row2 to match row1 width
+                cv::resize(debug_row2, debug_row2, cv::Size(debug_row1.cols, debug_row2.rows));
+            }
+            
+            // ensure both rows have same height
+            if (debug_row1.rows != debug_row2.rows)
+            {
+                if (debug_row1.rows < debug_row2.rows)
+                    cv::resize(debug_row1, debug_row1, cv::Size(debug_row1.cols, debug_row2.rows));
+                else
+                    cv::resize(debug_row2, debug_row2, cv::Size(debug_row2.cols, debug_row1.rows));
+            }
+            
+            // stack rows vertically (now both have same width, height, and type)
             cv::vconcat(debug_row1, debug_row2, debug_image);
 
             // display results
