@@ -79,11 +79,62 @@ void fsiv_compute_edges(const cv::Mat& gray, int low, int high, cv::Mat& edges)
 void fsiv_refine_foreground_mask(
     const cv::Mat& motion_u, const cv::Mat& edges_u, int dilate_radius, cv::Mat& refined_u)
 {
-    // TODO: Implement mask refinement using edges
+    // dilate edges to expand edge regions
+    cv::Mat dilated_edges;
+    if (dilate_radius > 0)
+    {
+        cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, 
+                                                    cv::Size(2 * dilate_radius + 1, 2 * dilate_radius + 1));
+        cv::dilate(edges_u, dilated_edges, kernel);
+    }
+    else
+    {
+        dilated_edges = edges_u.clone();
+    }
+    
+    // combine motion mask with dilated edges using union (OR operation)
+    cv::bitwise_or(motion_u, dilated_edges, refined_u);
 }
 
 void fsiv_apply_background_blur(
     const cv::Mat& bgr, const cv::Mat& fg_mask_u, int blur_radius, cv::Mat& out_bgr)
 {
-    // TODO: Implement background blur with foreground preservation
+    // if blur radius is 0, just copy the original image
+    if (blur_radius == 0)
+    {
+        bgr.copyTo(out_bgr);
+        return;
+    }
+    
+    // apply gaussian blur to create blurred background
+    cv::Mat blurred;
+    int kernel_size = 2 * blur_radius + 1;
+    cv::GaussianBlur(bgr, blurred, cv::Size(kernel_size, kernel_size), 0);
+    
+    // convert mask to float [0..1] for blending
+    cv::Mat mask_f;
+    fg_mask_u.convertTo(mask_f, CV_32F, 1.0 / 255.0);
+    
+    // create 3-channel mask for color image blending
+    std::vector<cv::Mat> mask_channels;
+    mask_channels.push_back(mask_f);
+    mask_channels.push_back(mask_f);
+    mask_channels.push_back(mask_f);
+    cv::Mat mask_3ch;
+    cv::merge(mask_channels, mask_3ch);
+    
+    // convert images to float for blending
+    cv::Mat bgr_f, blurred_f;
+    bgr.convertTo(bgr_f, CV_32F);
+    blurred.convertTo(blurred_f, CV_32F);
+    
+    // composite: foreground from original, background from blurred
+    cv::Mat result_f;
+    cv::multiply(bgr_f, mask_3ch, result_f);
+    cv::Mat bg_part;
+    cv::multiply(blurred_f, cv::Scalar(1.0, 1.0, 1.0) - mask_3ch, bg_part);
+    result_f = result_f + bg_part;
+    
+    // convert back to 8bit unsigned
+    result_f.convertTo(out_bgr, CV_8U);
 }
