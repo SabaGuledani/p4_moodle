@@ -4,7 +4,6 @@
  */
 
 #include "fsiv_funcs.hpp"
-#include <cmath>
 
 void fsiv_to_grayscale(const cv::Mat& bgr, cv::Mat& gray)
 {
@@ -92,8 +91,27 @@ void fsiv_refine_foreground_mask(
         dilated_edges = edges_u.clone();
     }
     
-    // combine motion mask with dilated edges using union (OR operation)
-    cv::bitwise_or(motion_u, dilated_edges, refined_u);
+    // Only use edges that are near motion areas to avoid including background edges
+    // Dilate motion mask to create a region of interest
+    cv::Mat motion_roi;
+    cv::Mat kernel_roi = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(21, 21));
+    cv::dilate(motion_u, motion_roi, kernel_roi);
+    
+    // Mask edges to only include those near motion
+    cv::Mat constrained_edges;
+    cv::bitwise_and(dilated_edges, motion_roi, constrained_edges);
+    
+    // combine motion mask with constrained edges using union (OR operation)
+    cv::bitwise_or(motion_u, constrained_edges, refined_u);
+    
+    // Clean up the mask using morphological operations
+    // Closing: fill small holes inside foreground objects
+    cv::Mat kernel_close = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
+    cv::morphologyEx(refined_u, refined_u, cv::MORPH_CLOSE, kernel_close);
+    
+    // Opening: remove small isolated background regions that were incorrectly marked as foreground
+    cv::Mat kernel_open = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
+    cv::morphologyEx(refined_u, refined_u, cv::MORPH_OPEN, kernel_open);
 }
 
 void fsiv_apply_background_blur(
@@ -106,35 +124,15 @@ void fsiv_apply_background_blur(
         return;
     }
     
-    // apply gaussian blur to create blurred background
+    // apply gaussian blur to the entire image
     cv::Mat blurred;
     int kernel_size = 2 * blur_radius + 1;
     cv::GaussianBlur(bgr, blurred, cv::Size(kernel_size, kernel_size), 0);
     
-    // convert mask to float [0..1] for blending
-    cv::Mat mask_f;
-    fg_mask_u.convertTo(mask_f, CV_32F, 1.0 / 255.0);
+    // Start with the blurred image (background)
+    blurred.copyTo(out_bgr);
     
-    // create 3-channel mask for color image blending
-    std::vector<cv::Mat> mask_channels;
-    mask_channels.push_back(mask_f);
-    mask_channels.push_back(mask_f);
-    mask_channels.push_back(mask_f);
-    cv::Mat mask_3ch;
-    cv::merge(mask_channels, mask_3ch);
-    
-    // convert images to float for blending
-    cv::Mat bgr_f, blurred_f;
-    bgr.convertTo(bgr_f, CV_32F);
-    blurred.convertTo(blurred_f, CV_32F);
-    
-    // composite: foreground from original, background from blurred
-    cv::Mat result_f;
-    cv::multiply(bgr_f, mask_3ch, result_f);
-    cv::Mat bg_part;
-    cv::multiply(blurred_f, cv::Scalar(1.0, 1.0, 1.0) - mask_3ch, bg_part);
-    result_f = result_f + bg_part;
-    
-    // convert back to 8bit unsigned
-    result_f.convertTo(out_bgr, CV_8U);
+    // Overwrite foreground areas with original sharp image using mask
+    // fg_mask_u: 255 = foreground (keep original/sharp), 0 = background (keep blurred)
+    bgr.copyTo(out_bgr, fg_mask_u);
 }
