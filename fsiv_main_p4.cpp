@@ -170,7 +170,7 @@ int main(int argc, char** argv)
             cv::Mat blurred_box;
             cv::boxFilter(frame, blurred_box, -1, cv::Size(11, 11));
 
-            // normalize flow magnitude for visualization
+            // normalize flow magnitude for visualization and resize to match frame
             cv::Mat mag_vis;
             double mag_min, mag_max;
             cv::minMaxLoc(mag, &mag_min, &mag_max);
@@ -182,6 +182,11 @@ int main(int argc, char** argv)
             {
                 mag_vis = cv::Mat::zeros(mag.size(), CV_8U);
             }
+            // resize to match frame size if needed
+            if (mag_vis.size() != frame.size())
+            {
+                cv::resize(mag_vis, mag_vis, frame.size());
+            }
             cv::cvtColor(mag_vis, mag_vis, cv::COLOR_GRAY2BGR);
 
             // create mask visualization (motion mask with dilation radius 5 as in Figure 2)
@@ -189,21 +194,58 @@ int main(int argc, char** argv)
             cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, 
                                                       cv::Size(2 * 5 + 1, 2 * 5 + 1));
             cv::dilate(mask_vis, mask_vis, kernel);
+            // resize to match frame size if needed
+            if (mask_vis.size() != frame.size())
+            {
+                cv::resize(mask_vis, mask_vis, frame.size());
+            }
             cv::cvtColor(mask_vis, mask_vis, cv::COLOR_GRAY2BGR);
+
+            // ensure output is same size as frame
+            cv::Mat output_resized = output;
+            if (output.size() != frame.size())
+            {
+                cv::resize(output, output_resized, frame.size());
+            }
+
+            // ensure all images have exactly the same size before concatenation
+            cv::Size target_size = frame.size();
+            cv::Mat frame_vis, blurred_vis, mag_vis_resized, mask_vis_resized, output_vis;
+            
+            frame.copyTo(frame_vis);
+            if (blurred_box.size() != target_size)
+                cv::resize(blurred_box, blurred_vis, target_size);
+            else
+                blurred_box.copyTo(blurred_vis);
+                
+            if (mag_vis.size() != target_size)
+                cv::resize(mag_vis, mag_vis_resized, target_size);
+            else
+                mag_vis.copyTo(mag_vis_resized);
+                
+            if (mask_vis.size() != target_size)
+                cv::resize(mask_vis, mask_vis_resized, target_size);
+            else
+                mask_vis.copyTo(mask_vis_resized);
+                
+            if (output_resized.size() != target_size)
+                cv::resize(output_resized, output_vis, target_size);
+            else
+                output_resized.copyTo(output_vis);
 
             // combine into five-panel debug image: 
             // row 1: original, blurred, flow mag (3 panels)
             // row 2: mask, result, empty (3 panels to match width)
             cv::Mat debug_row1, debug_row2, debug_image;
-            cv::hconcat(frame, blurred_box, debug_row1);
-            cv::hconcat(debug_row1, mag_vis, debug_row1);
+            cv::hconcat(frame_vis, blurred_vis, debug_row1);
+            cv::hconcat(debug_row1, mag_vis_resized, debug_row1);
             
             // create empty panel to match row 1 width
-            cv::Mat empty_panel = cv::Mat::zeros(frame.rows, frame.cols, CV_8UC3);
-            cv::hconcat(mask_vis, output, debug_row2);
+            cv::Mat empty_panel = cv::Mat::zeros(target_size, CV_8UC3);
+            cv::hconcat(mask_vis_resized, output_vis, debug_row2);
             cv::hconcat(debug_row2, empty_panel, debug_row2);
             
-            // stack rows vertically (now both have same width)
+            // stack rows vertically (now both have same width and height)
             cv::vconcat(debug_row1, debug_row2, debug_image);
 
             // display results
