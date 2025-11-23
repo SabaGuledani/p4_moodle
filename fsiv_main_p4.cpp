@@ -208,84 +208,119 @@ int main(int argc, char** argv)
                 cv::resize(output, output_resized, frame.size());
             }
 
-            // ensure all images have exactly the same size and type before concatenation
+            // create debug visualization using canvas approach (more reliable than concat)
+            // layout: row 1: original, blurred, flow mag (3 panels)
+            //         row 2: mask, result, empty (3 panels)
             cv::Size target_size = frame.size();
-            cv::Mat frame_vis, blurred_vis, mag_vis_resized, mask_vis_resized, output_vis;
+            int panel_width = target_size.width;
+            int panel_height = target_size.height;
             
-            // ensure frame is CV_8UC3
-            if (frame.type() != CV_8UC3)
-                frame.convertTo(frame_vis, CV_8UC3);
-            else
-                frame.copyTo(frame_vis);
-            if (frame_vis.size() != target_size)
-                cv::resize(frame_vis, frame_vis, target_size);
+            // create canvas: 3 panels wide, 2 panels tall
+            cv::Mat debug_image = cv::Mat::zeros(panel_height * 2, panel_width * 3, CV_8UC3);
             
-            // ensure blurred_box is CV_8UC3 and correct size
-            if (blurred_box.type() != CV_8UC3)
-                blurred_box.convertTo(blurred_vis, CV_8UC3);
-            else
-                blurred_box.copyTo(blurred_vis);
-            if (blurred_vis.size() != target_size)
-                cv::resize(blurred_vis, blurred_vis, target_size);
-                
-            // ensure mag_vis is CV_8UC3 and correct size
-            if (mag_vis.type() != CV_8UC3)
-                mag_vis.convertTo(mag_vis_resized, CV_8UC3);
-            else
-                mag_vis.copyTo(mag_vis_resized);
-            if (mag_vis_resized.size() != target_size)
-                cv::resize(mag_vis_resized, mag_vis_resized, target_size);
-                
-            // ensure mask_vis is CV_8UC3 and correct size
-            if (mask_vis.type() != CV_8UC3)
-                mask_vis.convertTo(mask_vis_resized, CV_8UC3);
-            else
-                mask_vis.copyTo(mask_vis_resized);
-            if (mask_vis_resized.size() != target_size)
-                cv::resize(mask_vis_resized, mask_vis_resized, target_size);
-                
-            // ensure output is CV_8UC3 and correct size
-            if (output_resized.type() != CV_8UC3)
-                output_resized.convertTo(output_vis, CV_8UC3);
-            else
-                output_resized.copyTo(output_vis);
-            if (output_vis.size() != target_size)
-                cv::resize(output_vis, output_vis, target_size);
-
-            // create empty panel with exact same size and type
-            cv::Mat empty_panel = cv::Mat::zeros(target_size, CV_8UC3);
-
-            // combine into five-panel debug image: 
-            // row 1: original, blurred, flow mag (3 panels)
-            // row 2: mask, result, empty (3 panels to match width)
-            cv::Mat debug_row1, debug_row2, debug_image;
+            // prepare all images to be CV_8UC3 and correct size
+            cv::Mat frame_vis, blurred_vis, mag_vis_final, mask_vis_final, output_vis;
             
-            // build row 1: frame + blurred + mag
-            cv::hconcat(frame_vis, blurred_vis, debug_row1);
-            cv::hconcat(debug_row1, mag_vis_resized, debug_row1);
-            
-            // build row 2: mask + output + empty
-            cv::hconcat(mask_vis_resized, output_vis, debug_row2);
-            cv::hconcat(debug_row2, empty_panel, debug_row2);
-            
-            // verify both rows have same width before vconcat
-            if (debug_row1.cols != debug_row2.cols)
+            // frame
+            if (frame.type() != CV_8UC3 || frame.size() != target_size)
             {
-                // resize row2 to match row1 width
-                cv::resize(debug_row2, debug_row2, cv::Size(debug_row1.cols, debug_row2.rows));
-            }
-            
-            // ensure both rows have same height
-            if (debug_row1.rows != debug_row2.rows)
-            {
-                if (debug_row1.rows < debug_row2.rows)
-                    cv::resize(debug_row1, debug_row1, cv::Size(debug_row1.cols, debug_row2.rows));
+                cv::Mat temp;
+                if (frame.type() != CV_8UC3)
+                    frame.convertTo(temp, CV_8UC3);
                 else
-                    cv::resize(debug_row2, debug_row2, cv::Size(debug_row2.cols, debug_row1.rows));
+                    temp = frame;
+                if (temp.size() != target_size)
+                    cv::resize(temp, frame_vis, target_size);
+                else
+                    frame_vis = temp;
+            }
+            else
+            {
+                frame.copyTo(frame_vis);
             }
             
-            // stack rows vertically (now both have same width, height, and type)
-            cv::vconcat(debug_row1, debug_row2, debug_image);
+            // blurred
+            if (blurred_box.type() != CV_8UC3 || blurred_box.size() != target_size)
+            {
+                cv::Mat temp;
+                if (blurred_box.type() != CV_8UC3)
+                    blurred_box.convertTo(temp, CV_8UC3);
+                else
+                    temp = blurred_box;
+                if (temp.size() != target_size)
+                    cv::resize(temp, blurred_vis, target_size);
+                else
+                    blurred_vis = temp;
+            }
+            else
+            {
+                blurred_box.copyTo(blurred_vis);
+            }
+            
+            // mag_vis
+            if (mag_vis.type() != CV_8UC3 || mag_vis.size() != target_size)
+            {
+                cv::Mat temp;
+                if (mag_vis.type() != CV_8UC3)
+                    mag_vis.convertTo(temp, CV_8UC3);
+                else
+                    temp = mag_vis;
+                if (temp.size() != target_size)
+                    cv::resize(temp, mag_vis_final, target_size);
+                else
+                    mag_vis_final = temp;
+            }
+            else
+            {
+                mag_vis.copyTo(mag_vis_final);
+            }
+            
+            // mask_vis
+            if (mask_vis.type() != CV_8UC3 || mask_vis.size() != target_size)
+            {
+                cv::Mat temp;
+                if (mask_vis.type() != CV_8UC3)
+                    mask_vis.convertTo(temp, CV_8UC3);
+                else
+                    temp = mask_vis;
+                if (temp.size() != target_size)
+                    cv::resize(temp, mask_vis_final, target_size);
+                else
+                    mask_vis_final = temp;
+            }
+            else
+            {
+                mask_vis.copyTo(mask_vis_final);
+            }
+            
+            // output
+            if (output_resized.type() != CV_8UC3 || output_resized.size() != target_size)
+            {
+                cv::Mat temp;
+                if (output_resized.type() != CV_8UC3)
+                    output_resized.convertTo(temp, CV_8UC3);
+                else
+                    temp = output_resized;
+                if (temp.size() != target_size)
+                    cv::resize(temp, output_vis, target_size);
+                else
+                    output_vis = temp;
+            }
+            else
+            {
+                output_resized.copyTo(output_vis);
+            }
+            
+            // copy images into canvas regions
+            // row 1: panel 0, 1, 2
+            frame_vis.copyTo(debug_image(cv::Rect(0, 0, panel_width, panel_height)));
+            blurred_vis.copyTo(debug_image(cv::Rect(panel_width, 0, panel_width, panel_height)));
+            mag_vis_final.copyTo(debug_image(cv::Rect(panel_width * 2, 0, panel_width, panel_height)));
+            
+            // row 2: panel 0, 1, 2 (empty for panel 2)
+            mask_vis_final.copyTo(debug_image(cv::Rect(0, panel_height, panel_width, panel_height)));
+            output_vis.copyTo(debug_image(cv::Rect(panel_width, panel_height, panel_width, panel_height)));
+            // panel 2 of row 2 is already zeros (empty)
 
             // display results
             cv::imshow(kWinOut, output);
