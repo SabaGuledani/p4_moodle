@@ -1,5 +1,4 @@
 *.txt
-*.png
 data/
 !CMakeLists.txt
-
+build/
