@@ -4,7 +4,6 @@
  */
 
 #include "fsiv_funcs.hpp"
-#include <cmath>
 
 void fsiv_to_grayscale(const cv::Mat& bgr, cv::Mat& gray)
 {
