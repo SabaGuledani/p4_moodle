@@ -92,8 +92,27 @@ void fsiv_refine_foreground_mask(
         dilated_edges = edges_u.clone();
     }
     
-    // combine motion mask with dilated edges using union (OR operation)
-    cv::bitwise_or(motion_u, dilated_edges, refined_u);
+    // Only use edges that are near motion areas to avoid including background edges
+    // Dilate motion mask to create a region of interest
+    cv::Mat motion_roi;
+    cv::Mat kernel_roi = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(21, 21));
+    cv::dilate(motion_u, motion_roi, kernel_roi);
+    
+    // Mask edges to only include those near motion
+    cv::Mat constrained_edges;
+    cv::bitwise_and(dilated_edges, motion_roi, constrained_edges);
+    
+    // combine motion mask with constrained edges using union (OR operation)
+    cv::bitwise_or(motion_u, constrained_edges, refined_u);
+    
+    // Clean up the mask using morphological operations
+    // Closing: fill small holes inside foreground objects
+    cv::Mat kernel_close = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
+    cv::morphologyEx(refined_u, refined_u, cv::MORPH_CLOSE, kernel_close);
+    
+    // Opening: remove small isolated background regions that were incorrectly marked as foreground
+    cv::Mat kernel_open = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
+    cv::morphologyEx(refined_u, refined_u, cv::MORPH_OPEN, kernel_open);
 }
 
 void fsiv_apply_background_blur(
