@@ -129,10 +129,17 @@ void fsiv_apply_background_blur(
     blurred.convertTo(blurred_f, CV_32F);
     
     // composite: foreground from original, background from blurred
+    // mask_3ch: 1.0 = foreground (keep original), 0.0 = background (apply blur)
     cv::Mat result_f;
-    cv::multiply(bgr_f, mask_3ch, result_f);
+    cv::multiply(bgr_f, mask_3ch, result_f);  // foreground part from original
+    
+    // create inverted mask for background: 1.0 - mask_3ch
+    cv::Mat ones = cv::Mat::ones(mask_3ch.size(), mask_3ch.type());
+    cv::Mat inv_mask_3ch;
+    cv::subtract(ones, mask_3ch, inv_mask_3ch);
+    
     cv::Mat bg_part;
-    cv::multiply(blurred_f, cv::Scalar(1.0, 1.0, 1.0) - mask_3ch, bg_part);
+    cv::multiply(blurred_f, inv_mask_3ch, bg_part);  // background part from blurred
     result_f = result_f + bg_part;
     
     // convert back to 8bit unsigned

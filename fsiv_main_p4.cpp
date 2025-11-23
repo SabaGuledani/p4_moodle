@@ -162,6 +162,19 @@ int main(int argc, char** argv)
             // refine foreground mask using edges
             fsiv_refine_foreground_mask(motion_mask, edges, g_edge_dil, refined_mask);
 
+            // DEBUG: Print mask statistics (only every 30 frames to avoid spam)
+            if (frame_count % 30 == 0)
+            {
+                int fg_pixels = cv::countNonZero(refined_mask);
+                int total_pixels = refined_mask.rows * refined_mask.cols;
+                double fg_percent = 100.0 * fg_pixels / total_pixels;
+                std::cout << "Frame " << frame_count 
+                          << ": Mask stats - FG pixels: " << fg_pixels 
+                          << "/" << total_pixels 
+                          << " (" << fg_percent << "%), "
+                          << "Blur radius: " << g_blur_radius << std::endl;
+            }
+
             // apply background blur
             fsiv_apply_background_blur(frame, refined_mask, g_blur_radius, output);
 
@@ -221,6 +234,25 @@ int main(int argc, char** argv)
             std::string screenshot_name = "screenshot_" + std::to_string(frame_count) + ".png";
             cv::imwrite(screenshot_name, output);
             std::cout << "Screenshot saved: " << screenshot_name << std::endl;
+        }
+        else if (key == 'd' || key == 'D') // D to save debug images
+        {
+            if (!first_frame)
+            {
+                cv::imwrite("debug_mask.png", refined_mask);
+                cv::imwrite("debug_original.png", frame);
+                cv::imwrite("debug_output.png", output);
+                
+                // Create a visualization showing mask overlay
+                cv::Mat mask_overlay;
+                cv::cvtColor(refined_mask, mask_overlay, cv::COLOR_GRAY2BGR);
+                cv::Mat overlay;
+                cv::addWeighted(frame, 0.7, mask_overlay, 0.3, 0, overlay);
+                cv::imwrite("debug_mask_overlay.png", overlay);
+                
+                std::cout << "Debug images saved: debug_mask.png, debug_original.png, "
+                          << "debug_output.png, debug_mask_overlay.png" << std::endl;
+            }
         }
 
         frame_count++;
