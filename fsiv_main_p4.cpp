@@ -193,12 +193,17 @@ int main(int argc, char** argv)
 
             // combine into five-panel debug image: 
             // row 1: original, blurred, flow mag (3 panels)
-            // row 2: mask, result (2 panels)
+            // row 2: mask, result, empty (3 panels to match width)
             cv::Mat debug_row1, debug_row2, debug_image;
             cv::hconcat(frame, blurred_box, debug_row1);
             cv::hconcat(debug_row1, mag_vis, debug_row1);
+            
+            // create empty panel to match row 1 width
+            cv::Mat empty_panel = cv::Mat::zeros(frame.rows, frame.cols, CV_8UC3);
             cv::hconcat(mask_vis, output, debug_row2);
-            // stack rows vertically
+            cv::hconcat(debug_row2, empty_panel, debug_row2);
+            
+            // stack rows vertically (now both have same width)
             cv::vconcat(debug_row1, debug_row2, debug_image);
 
             // display results
