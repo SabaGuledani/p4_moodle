@@ -165,21 +165,41 @@ int main(int argc, char** argv)
             // apply background blur
             fsiv_apply_background_blur(frame, refined_mask, g_blur_radius, output);
 
-            // create debug visualization (three panels: flow mag, edges, mask)
-            cv::Mat mag_vis, edges_vis, mask_vis;
-            mag.convertTo(mag_vis, CV_8U, 255.0 / 10.0); // normalize for visualization
-            edges.copyTo(edges_vis);
-            refined_mask.copyTo(mask_vis);
+            // create debug visualization according to Figure 2: 
+            // a) Original, b) Blurred (11x11 box), c) Flow magnitude, d) Mask, e) Result
+            cv::Mat blurred_box;
+            cv::boxFilter(frame, blurred_box, -1, cv::Size(11, 11));
 
-            // combine into three-panel debug image
-            cv::Mat debug_panel1, debug_panel2, debug_panel3;
-            cv::cvtColor(mag_vis, debug_panel1, cv::COLOR_GRAY2BGR);
-            cv::cvtColor(edges_vis, debug_panel2, cv::COLOR_GRAY2BGR);
-            cv::cvtColor(mask_vis, debug_panel3, cv::COLOR_GRAY2BGR);
+            // normalize flow magnitude for visualization
+            cv::Mat mag_vis;
+            double mag_min, mag_max;
+            cv::minMaxLoc(mag, &mag_min, &mag_max);
+            if (mag_max > 0)
+            {
+                mag.convertTo(mag_vis, CV_8U, 255.0 / mag_max);
+            }
+            else
+            {
+                mag_vis = cv::Mat::zeros(mag.size(), CV_8U);
+            }
+            cv::cvtColor(mag_vis, mag_vis, cv::COLOR_GRAY2BGR);
 
-            cv::Mat debug_top, debug_bottom, debug_image;
-            cv::hconcat(debug_panel1, debug_panel2, debug_top);
-            cv::hconcat(debug_top, debug_panel3, debug_image);
+            // create mask visualization (motion mask with dilation radius 5 as in Figure 2)
+            cv::Mat mask_vis = motion_mask.clone();
+            cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, 
+                                                      cv::Size(2 * 5 + 1, 2 * 5 + 1));
+            cv::dilate(mask_vis, mask_vis, kernel);
+            cv::cvtColor(mask_vis, mask_vis, cv::COLOR_GRAY2BGR);
+
+            // combine into five-panel debug image: 
+            // row 1: original, blurred, flow mag (3 panels)
+            // row 2: mask, result (2 panels)
+            cv::Mat debug_row1, debug_row2, debug_image;
+            cv::hconcat(frame, blurred_box, debug_row1);
+            cv::hconcat(debug_row1, mag_vis, debug_row1);
+            cv::hconcat(mask_vis, output, debug_row2);
+            // stack rows vertically
+            cv::vconcat(debug_row1, debug_row2, debug_image);
 
             // display results
             cv::imshow(kWinOut, output);
@@ -197,12 +217,14 @@ int main(int argc, char** argv)
             output = frame.clone();
             cv::imshow(kWinOut, output);
             
-            // initialize debug window with empty panels
+            // initialize debug window with empty panels (5 panels for Figure 2 layout)
             cv::Mat empty = cv::Mat::zeros(frame_height, frame_width, CV_8UC3);
-            cv::Mat empty_triple;
-            cv::hconcat(empty, empty, empty_triple);
-            cv::hconcat(empty_triple, empty, empty_triple);
-            cv::imshow(kWinDbg, empty_triple);
+            cv::Mat empty_row1, empty_row2, empty_panels;
+            cv::hconcat(empty, empty, empty_row1);
+            cv::hconcat(empty_row1, empty, empty_row1);
+            cv::hconcat(empty, empty, empty_row2);
+            cv::vconcat(empty_row1, empty_row2, empty_panels);
+            cv::imshow(kWinDbg, empty_panels);
             
             first_frame = false;
         }
