@@ -106,42 +106,15 @@ void fsiv_apply_background_blur(
         return;
     }
     
-    // apply gaussian blur to create blurred background
+    // apply gaussian blur to the entire image
     cv::Mat blurred;
     int kernel_size = 2 * blur_radius + 1;
     cv::GaussianBlur(bgr, blurred, cv::Size(kernel_size, kernel_size), 0);
     
-    // convert mask to float [0..1] for blending
-    cv::Mat mask_f;
-    fg_mask_u.convertTo(mask_f, CV_32F, 1.0 / 255.0);
+    // Start with the blurred image (background)
+    blurred.copyTo(out_bgr);
     
-    // create 3-channel mask for color image blending
-    std::vector<cv::Mat> mask_channels;
-    mask_channels.push_back(mask_f);
-    mask_channels.push_back(mask_f);
-    mask_channels.push_back(mask_f);
-    cv::Mat mask_3ch;
-    cv::merge(mask_channels, mask_3ch);
-    
-    // convert images to float for blending
-    cv::Mat bgr_f, blurred_f;
-    bgr.convertTo(bgr_f, CV_32F);
-    blurred.convertTo(blurred_f, CV_32F);
-    
-    // composite: foreground from original, background from blurred
-    // mask_3ch: 1.0 = foreground (keep original), 0.0 = background (apply blur)
-    cv::Mat result_f;
-    cv::multiply(bgr_f, mask_3ch, result_f);  // foreground part from original
-    
-    // create inverted mask for background: 1.0 - mask_3ch
-    cv::Mat ones = cv::Mat::ones(mask_3ch.size(), mask_3ch.type());
-    cv::Mat inv_mask_3ch;
-    cv::subtract(ones, mask_3ch, inv_mask_3ch);
-    
-    cv::Mat bg_part;
-    cv::multiply(blurred_f, inv_mask_3ch, bg_part);  // background part from blurred
-    result_f = result_f + bg_part;
-    
-    // convert back to 8bit unsigned
-    result_f.convertTo(out_bgr, CV_8U);
+    // Overwrite foreground areas with original sharp image using mask
+    // fg_mask_u: 255 = foreground (keep original/sharp), 0 = background (keep blurred)
+    bgr.copyTo(out_bgr, fg_mask_u);
 }
