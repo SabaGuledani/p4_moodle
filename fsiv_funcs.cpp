@@ -4,6 +4,7 @@
  */
 
 #include "fsiv_funcs.hpp"
+#include <algorithm>
 
 void fsiv_to_grayscale(const cv::Mat& bgr, cv::Mat& gray)
 {
@@ -66,6 +67,9 @@ void fsiv_update_running_mask(
     
     // convert back to 8bit unsigned and update output
     prev_mask_f.convertTo(out_mask_u, CV_8U, 255.0);
+    
+    // keep the temporal mask binary to avoid lingering low-valued foreground
+    cv::threshold(out_mask_u, out_mask_u, 128.0, 255.0, cv::THRESH_BINARY);
 }
 
 void fsiv_compute_edges(const cv::Mat& gray, int low, int high, cv::Mat& edges)
@@ -94,7 +98,9 @@ void fsiv_refine_foreground_mask(
     // only use edges that are near motion areas to avoid including background edges
     // dilate motion mask to create a region of interest
     cv::Mat motion_roi;
-    cv::Mat kernel_roi = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(21, 21));
+    int roi_size = std::max(3, 2 * dilate_radius + 1); // tie halo width to user dial
+    cv::Mat kernel_roi = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+                                                   cv::Size(roi_size, roi_size));
     cv::dilate(motion_u, motion_roi, kernel_roi);
     
     // mask edges to only include those near motion
