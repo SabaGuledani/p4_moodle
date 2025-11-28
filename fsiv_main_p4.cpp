@@ -216,7 +216,7 @@
          {
              break;
          }
-         else if (key == 's' || key == 'S') // S to save screenshot
+         else if (key == 's' || key == 'S') // S to save screenshot and add frame number to filename to avoid dublicating
          {
              std::string screenshot_name = "screenshot_" + std::to_string(frame_count) + ".png";
              cv::imwrite(screenshot_name, output);
