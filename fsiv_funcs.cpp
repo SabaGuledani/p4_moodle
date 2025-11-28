@@ -91,25 +91,25 @@ void fsiv_refine_foreground_mask(
         dilated_edges = edges_u.clone();
     }
     
-    // Only use edges that are near motion areas to avoid including background edges
-    // Dilate motion mask to create a region of interest
+    // only use edges that are near motion areas to avoid including background edges
+    // dilate motion mask to create a region of interest
     cv::Mat motion_roi;
     cv::Mat kernel_roi = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(21, 21));
     cv::dilate(motion_u, motion_roi, kernel_roi);
     
-    // Mask edges to only include those near motion
+    // mask edges to only include those near motion
     cv::Mat constrained_edges;
     cv::bitwise_and(dilated_edges, motion_roi, constrained_edges);
     
     // combine motion mask with constrained edges using union (OR operation)
     cv::bitwise_or(motion_u, constrained_edges, refined_u);
     
-    // Clean up the mask using morphological operations
-    // Closing: fill small holes inside foreground objects
+    // clean up the mask using morphological operations
+    // closing: fill small holes inside foreground objects
     cv::Mat kernel_close = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
     cv::morphologyEx(refined_u, refined_u, cv::MORPH_CLOSE, kernel_close);
     
-    // Opening: remove small isolated background regions that were incorrectly marked as foreground
+    // opening: remove small isolated background regions that were incorrectly marked as foreground
     cv::Mat kernel_open = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
     cv::morphologyEx(refined_u, refined_u, cv::MORPH_OPEN, kernel_open);
 }
@@ -129,10 +129,10 @@ void fsiv_apply_background_blur(
     int kernel_size = 2 * blur_radius + 1;
     cv::GaussianBlur(bgr, blurred, cv::Size(kernel_size, kernel_size), 0);
     
-    // Start with the blurred image (background)
+    // start with the blurred image (background)
     blurred.copyTo(out_bgr);
     
-    // Overwrite foreground areas with original sharp image using mask
+    // overwrite foreground areas with original sharp image using mask
     // fg_mask_u: 255 = foreground (keep original/sharp), 0 = background (keep blurred)
     bgr.copyTo(out_bgr, fg_mask_u);
 }

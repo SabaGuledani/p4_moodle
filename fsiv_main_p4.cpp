@@ -96,7 +96,7 @@
      int frame_width = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
      int frame_height = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
      double fps = cap.get(cv::CAP_PROP_FPS);
-     if (fps <= 0) fps = 30.0; // default fps if not available
+     if (fps <= 0) fps = 30.0; // default fps
  
      // setup output video writer
      cv::VideoWriter writer;
@@ -193,7 +193,7 @@
          }
          else
          {
-             // first frame: just show original
+             // show original
              output = frame.clone();
              cv::imshow(kWinOut, output);
              
